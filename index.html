@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Meaning Finder</title>
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --card: #ffffff;
+    --ink: #2b2b2b;
+    --muted: #6b6b6b;
+    --accent: #5b4636;
+    --accent-light: #8a7361;
+    --border: #e2ddd3;
+    --success: #3f7a4e;
+    --error: #b0413e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    font-family: 'Georgia', 'Segoe UI', serif;
+    color: var(--ink);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .wrap { width: 100%; max-width: 640px; }
+  h1 {
+    text-align: center;
+    font-size: 1.8rem;
+    color: var(--accent);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 28px;
+  }
+  .search-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+    position: relative;
+  }
+  .input-wrap { flex: 1; position: relative; }
+  input[type="text"] {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    font-family: inherit;
+  }
+  input[type="text"]:focus { outline: 2px solid var(--accent-light); }
+
+  .suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 10;
+    display: none;
+  }
+  .suggestions.visible { display: block; }
+  .suggestion-item {
+    padding: 9px 14px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:hover,
+  .suggestion-item.active {
+    background: var(--bg);
+    color: var(--accent);
+  }
+  .search-spacer { margin-bottom: 20px; }
+  button {
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  button:hover { background: var(--accent-light); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  button.secondary:hover { background: var(--border); }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px;
+    margin-bottom: 20px;
+    display: none;
+  }
+  .card.visible { display: block; }
+  .word-title {
+    font-size: 1.6rem;
+    color: var(--accent);
+    margin: 0 0 2px 0;
+  }
+  .phonetic {
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .audio-btn {
+    background: var(--border);
+    color: var(--accent);
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .audio-btn:hover { background: var(--accent-light); color: #fff; }
+  .audio-btn.playing { background: var(--accent); color: #fff; }
+  .meaning-block { margin-bottom: 14px; }
+  .pos {
+    display: inline-block;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--border);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+  .definition { margin: 4px 0; line-height: 1.5; }
+  .definition::before { content: "• "; color: var(--accent-light); }
+  .example {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-style: italic;
+    margin-left: 16px;
+  }
+  .status {
+    text-align: center;
+    margin: 12px 0;
+    font-size: 0.9rem;
+    min-height: 20px;
+  }
+  .status.error { color: var(--error); }
+  .status.success { color: var(--success); }
+  .status.loading { color: var(--muted); }
+
+  .actions { display: flex; gap: 10px; margin-top: 10px; }
+
+  .history {
+    margin-top: 28px;
+  }
+  .history h2 {
+    font-size: 1rem;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .history-item .h-word { font-weight: bold; color: var(--accent); }
+  .history-item .h-meaning { color: var(--muted); flex: 1; margin-left: 12px; text-align: right; }
+
+  .setup-note {
+    background: #fff8e6;
+    border: 1px solid #e8d9a8;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.85rem;
+    color: #6b5a1e;
+    margin-bottom: 20px;
+    display: none;
+  }
+  .setup-note.visible { display: block; }
+  .setup-note code {
+    background: #f0e6c8;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+  }
+
+  .wotd-card {
+    background: linear-gradient(135deg, #5b4636, #7a5f4a);
+    color: #fff;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .wotd-card.visible { display: block; }
+  .wotd-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.8;
+    margin-bottom: 4px;
+  }
+  .wotd-word {
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  .wotd-meaning {
+    font-size: 0.9rem;
+    opacity: 0.95;
+    line-height: 1.4;
+  }
+  .wotd-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+  }
+  .wotd-actions button {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.4);
+    color: #fff;
+    padding: 6px 12px;
+    font-size: 0.82rem;
+  }
+  .wotd-actions button:hover { background: rgba(255,255,255,0.28); }
+
+  .synant-section { margin-top: 14px; }
+  .synant-row { margin-bottom: 8px; }
+  .synant-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .tag-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    border: 1px solid var(--border);
+  }
+  .tag.syn { background: #eef4ee; color: var(--success); border-color: #cde0cd; }
+  .tag.ant { background: #f6ecec; color: var(--error); border-color: #e5c9c9; }
+  .tag:hover { opacity: 0.75; }
+
+  .top-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .top-actions button {
+    font-size: 0.85rem;
+    padding: 8px 14px;
+  }
+
+  .quiz-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(30, 24, 18, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+  }
+  .quiz-overlay.visible { display: flex; }
+  .quiz-box {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 28px;
+    max-width: 480px;
+    width: 100%;
+    text-align: center;
+  }
+  .quiz-progress {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .quiz-word {
+    font-size: 1.7rem;
+    color: var(--accent);
+    font-weight: bold;
+    margin-bottom: 18px;
+    min-height: 1.2em;
+  }
+  .quiz-meaning {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 18px;
+    display: none;
+    text-align: left;
+  }
+  .quiz-meaning.visible { display: block; }
+  .quiz-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  .quiz-actions button.correct { background: var(--success); }
+  .quiz-actions button.incorrect { background: var(--error); }
+  .quiz-close {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    background: none;
+    color: var(--muted);
+    font-size: 1.3rem;
+    padding: 2px 8px;
+  }
+  .quiz-box { position: relative; }
+  .quiz-score {
+    margin-top: 16px;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .quiz-empty {
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  .quiz-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+  }
+  .quiz-option {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    cursor: pointer;
+    color: var(--ink);
+    text-align: left;
+    font-family: inherit;
+  }
+  .quiz-option:hover { border-color: var(--accent-light); }
+  .quiz-option:disabled { cursor: default; opacity: 1; }
+  .quiz-option.correct-answer {
+    background: #d9ecd9;
+    border-color: var(--success);
+    border-width: 2px;
+    color: #24552e;
+    font-weight: bold;
+  }
+  .quiz-option.wrong-answer {
+    background: #f5d7d6;
+    border-color: var(--error);
+    border-width: 2px;
+    color: #7a2321;
+    font-weight: bold;
+  }
+  .quiz-next-row { margin-top: 16px; }
+  .quiz-loading { color: var(--muted); font-size: 0.9rem; padding: 20px 0; }
+  .quiz-final-score {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--accent);
+    margin: 10px 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Word Meaning Finder</h1>
+  <div class="subtitle">Look up a word, then save it to your Google Sheet</div>
+
+  <div class="setup-note" id="setupNote">
+    <strong>One-time setup needed:</strong> paste your Google Apps Script Web App URL into the
+    <code>SHEET_URL</code> constant near the top of the script in this file. See instructions at the bottom of this message.
+  </div>
+
+  <div class="wotd-card" id="wotdCard">
+    <div class="wotd-label">Word of the Day</div>
+    <div class="wotd-word" id="wotdWord">Loading...</div>
+    <div class="wotd-meaning" id="wotdMeaning"></div>
+    <div class="wotd-actions">
+      <button id="wotdLookupBtn">See full details</button>
+      <button id="wotdSaveBtn">Save to sheet</button>
+    </div>
+  </div>
+
+  <div class="top-actions">
+    <button class="secondary" id="quizBtn">Quiz me on my sheet words</button>
+  </div>
+
+  <div class="search-row">
+    <div class="input-wrap">
+      <input type="text" id="wordInput" placeholder="Type a word..." autocomplete="off">
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <button id="lookupBtn">Look up</button>
+  </div>
+  <div class="search-spacer"></div>
+
+  <div class="status" id="status"></div>
+
+  <div class="card" id="resultCard">
+    <div class="word-title" id="resWord"></div>
+    <div class="phonetic" id="resPhonetic"></div>
+    <div id="resMeanings"></div>
+    <div class="synant-section" id="synantSection" style="display:none;">
+      <div class="synant-row" id="synRow" style="display:none;">
+        <div class="synant-label">Synonyms</div>
+        <div class="tag-group" id="synTags"></div>
+      </div>
+      <div class="synant-row" id="antRow" style="display:none;">
+        <div class="synant-label">Antonyms</div>
+        <div class="tag-group" id="antTags"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="saveBtn">Save to Google Sheet</button>
+    </div>
+  </div>
+
+  <div class="history" id="historySection" style="display:none;">
+    <h2>Saved this session</h2>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<div class="quiz-overlay" id="quizOverlay">
+  <div class="quiz-box">
+    <button class="quiz-close" id="quizCloseBtn">&times;</button>
+    <div id="quizContent"></div>
+  </div>
+</div>
+
+<script>
+// ====== SETUP: paste your Google Apps Script Web App URL here ======
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbyWBvKUo0ET3Sjosqb9nE3ZPA-VqThnW26Mw-f4nvZWfygYBcY8s6w6n2btDGoe__C0gQ/exec";
+// =====================================================================
+
+const wordInput = document.getElementById('wordInput');
+const lookupBtn = document.getElementById('lookupBtn');
+const saveBtn = document.getElementById('saveBtn');
+const statusEl = document.getElementById('status');
+const resultCard = document.getElementById('resultCard');
+const resWord = document.getElementById('resWord');
+const resPhonetic = document.getElementById('resPhonetic');
+const resMeanings = document.getElementById('resMeanings');
+const historySection = document.getElementById('historySection');
+const historyList = document.getElementById('historyList');
+const setupNote = document.getElementById('setupNote');
+const suggestionsBox = document.getElementById('suggestions');
+
+// Word of the Day
+const wotdCard = document.getElementById('wotdCard');
+const wotdWord = document.getElementById('wotdWord');
+const wotdMeaning = document.getElementById('wotdMeaning');
+const wotdLookupBtn = document.getElementById('wotdLookupBtn');
+const wotdSaveBtn = document.getElementById('wotdSaveBtn');
+
+// Synonyms/Antonyms
+const synantSection = document.getElementById('synantSection');
+const synRow = document.getElementById('synRow');
+const antRow = document.getElementById('antRow');
+const synTags = document.getElementById('synTags');
+const antTags = document.getElementById('antTags');
+
+// Quiz
+const quizBtn = document.getElementById('quizBtn');
+const quizOverlay = document.getElementById('quizOverlay');
+const quizContent = document.getElementById('quizContent');
+const quizCloseBtn = document.getElementById('quizCloseBtn');
+
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || 6000);
+  try {
+    const res = await fetch(url, { ...(options || {}), signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let currentEntry = null;
+let wotdEntry = null;
+let suggestDebounce = null;
+let activeSuggestionIndex = -1;
+let currentSuggestions = [];
+let savedWords = []; // { word, meaning } saved this session, used for quiz mode
+
+// A curated pool of solid vocabulary-building words for Word of the Day.
+// One is picked deterministically per calendar day, so it's the same all day
+// but changes daily.
+const WOTD_POOL = [
+  'ephemeral','ubiquitous','serendipity','mellifluous','resilient','eloquent',
+  'candid','meticulous','tenacious','pragmatic','ambivalent','austere',
+  'benevolent','cryptic','deft','elated','fastidious','gregarious',
+  'harbinger','idyllic','juxtapose','lucid','myriad','nebulous',
+  'obsolete','pensive','quintessential','resolute','sanguine','tacit',
+  'unassuming','vivacious','wistful','zealous','abate','bolster',
+  'candor','diligent','elusive','frivolous','garrulous','hapless',
+  'impetuous','jubilant','kinetic','languid','malleable','nostalgic',
+  'opulent','placid','quaint','ravenous','stoic','tangible',
+  'vindicate','whimsical','zenith','acumen','brevity','conundrum',
+  'discern','enigma','fortitude','gratuitous','hindrance','incisive',
+  'jocular','keen','lament','magnanimous','novel','ostensible',
+  'poignant','quandary','rhetoric','solace','trepidation','utopia',
+  'vex','wary','abstain','cajole','disparage','exuberant'
+];
+
+function pickWordOfTheDay() {
+  const start = new Date(2026, 0, 1); // fixed anchor so the rotation is stable
+  const today = new Date();
+  const dayIndex = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  const idx = ((dayIndex % WOTD_POOL.length) + WOTD_POOL.length) % WOTD_POOL.length;
+  return WOTD_POOL[idx];
+}
+
+async function loadWordOfTheDay() {
+  const word = pickWordOfTheDay();
+  wotdCard.classList.add('visible');
+  wotdWord.textContent = word;
+  wotdMeaning.textContent = 'Loading meaning...';
+
+  let data;
+  try {
+    data = await fetchDefinition(word);
+  } catch (err) {
+    data = null;
+  }
+  if (!data) data = await fetchFromDatamuseBackup(word);
+
+  if (!data) {
+    wotdMeaning.textContent = 'Meaning unavailable right now — tap "See full details" to try.';
+    wotdEntry = { word };
+    return;
+  }
+
+  const entry = data[0];
+  const firstDef = entry.meanings && entry.meanings[0] && entry.meanings[0].definitions[0]
+    ? entry.meanings[0].definitions[0].definition
+    : '';
+  wotdMeaning.textContent = firstDef;
+
+  const meaningsFlat = [];
+  entry.meanings.forEach(m => {
+    m.definitions.slice(0, 3).forEach(d => {
+      meaningsFlat.push(m.partOfSpeech + ': ' + d.definition);
+    });
+  });
+
+  wotdEntry = {
+    word: entry.word,
+    meaning: meaningsFlat.join(' | ')
+  };
+}
+
+wotdLookupBtn.addEventListener('click', () => {
+  wordInput.value = pickWordOfTheDay();
+  hideSuggestions();
+  lookupWord();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+wotdSaveBtn.addEventListener('click', async () => {
+  if (!wotdEntry || !wotdEntry.meaning) {
+    setStatus('Still loading the word of the day — try again in a moment.', 'error');
+    return;
+  }
+  if (!SHEET_URL || SHEET_URL.includes('PASTE_YOUR')) {
+    setStatus('Add your Google Apps Script URL in the code first.', 'error');
+    return;
+  }
+  wotdSaveBtn.disabled = true;
+  try {
+    await fetchWithTimeout(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'addWord', word: wotdEntry.word, meaning: wotdEntry.meaning })
+    }, 10000);
+    setStatus('Saved "' + wotdEntry.word + '" to your sheet.', 'success');
+    addToHistory(wotdEntry);
+  } catch (err) {
+    setStatus('Save failed. Check your Apps Script URL and internet connection.', 'error');
+  } finally {
+    wotdSaveBtn.disabled = false;
+  }
+});
+
+async function fetchSuggestions(prefix) {
+  try {
+    // Datamuse "sp" (spelled like) gives fast prefix-style word suggestions, no API key needed
+    const res = await fetchWithTimeout('https://api.datamuse.com/words?sp=' + encodeURIComponent(prefix) + '*&max=8', {}, 5000);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map(d => d.word);
+  } catch (err) {
+    return [];
+  }
+}
+
+function renderSuggestions(words) {
+  currentSuggestions = words;
+  activeSuggestionIndex = -1;
+  suggestionsBox.innerHTML = '';
+  if (!words.length) {
+    suggestionsBox.classList.remove('visible');
+    return;
+  }
+  words.forEach((w, i) => {
+    const item = document.createElement('div');
+    item.className = 'suggestion-item';
+    item.textContent = w;
+    item.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // prevent input blur before click registers
+      selectSuggestion(w);
+    });
+    suggestionsBox.appendChild(item);
+  });
+  suggestionsBox.classList.add('visible');
+}
+
+function selectSuggestion(word) {
+  wordInput.value = word;
+  suggestionsBox.classList.remove('visible');
+  suggestionsBox.innerHTML = '';
+  lookupWord();
+}
+
+function hideSuggestions() {
+  suggestionsBox.classList.remove('visible');
+}
+
+function updateActiveSuggestion() {
+  const items = suggestionsBox.querySelectorAll('.suggestion-item');
+  items.forEach((el, i) => {
+    el.classList.toggle('active', i === activeSuggestionIndex);
+  });
+  if (activeSuggestionIndex >= 0 && items[activeSuggestionIndex]) {
+    items[activeSuggestionIndex].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+wordInput.addEventListener('input', () => {
+  const val = wordInput.value.trim();
+  clearTimeout(suggestDebounce);
+  if (val.length < 2) {
+    hideSuggestions();
+    return;
+  }
+  suggestDebounce = setTimeout(async () => {
+    const words = await fetchSuggestions(val);
+    // Only render if input hasn't changed since the request went out
+    if (wordInput.value.trim() === val) {
+      renderSuggestions(words);
+    }
+  }, 180);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.input-wrap')) hideSuggestions();
+});
+
+if (!SHEET_URL || SHEET_URL.includes('PASTE_YOUR')) {
+  setupNote.classList.add('visible');
+}
+
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = 'status' + (type ? ' ' + type : '');
+}
+
+function getFallbackCandidates(word) {
+  const w = word.toLowerCase();
+  const candidates = [];
+
+  // -ly adverb -> adjective (clumsily -> clumsy, quickly -> quick, happily -> happy)
+  if (w.endsWith('ily') && w.length > 4) candidates.push(w.slice(0, -3) + 'y');
+  if (w.endsWith('ly') && w.length > 3) candidates.push(w.slice(0, -2));
+
+  // -ied -> -y (tried -> try), -ies -> -y (tries -> try)
+  if (w.endsWith('ied') && w.length > 4) candidates.push(w.slice(0, -3) + 'y');
+  if (w.endsWith('ies') && w.length > 4) candidates.push(w.slice(0, -3) + 'y');
+
+  // -ing (running -> run / running -> runn -> also try dropping double consonant)
+  if (w.endsWith('ing') && w.length > 5) {
+    const base = w.slice(0, -3);
+    candidates.push(base);
+    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) {
+      candidates.push(base.slice(0, -1)); // running -> run
+    } else {
+      candidates.push(base + 'e'); // making -> make
+    }
+  }
+
+  // -ed (walked -> walk, tried already covered, stopped -> stop)
+  if (w.endsWith('ed') && w.length > 4) {
+    const base = w.slice(0, -2);
+    candidates.push(base);
+    if (base.length > 2 && base[base.length - 1] === base[base.length - 2]) {
+      candidates.push(base.slice(0, -1));
+    } else {
+      candidates.push(base + 'e');
+    }
+  }
+
+  // plural -es / -s (boxes -> box, cats -> cat)
+  if (w.endsWith('es') && w.length > 4) candidates.push(w.slice(0, -2));
+  if (w.endsWith('s') && w.length > 3) candidates.push(w.slice(0, -1));
+
+  // de-duplicate, keep order
+  return [...new Set(candidates)];
+}
+
+async function fetchFromDatamuseBackup(word) {
+  try {
+    const res = await fetchWithTimeout('https://api.datamuse.com/words?sp=' + encodeURIComponent(word) + '&md=dp&max=1', {}, 6000);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length || !data[0].defs || !data[0].defs.length) return null;
+    const w = data[0];
+    if (w.word.toLowerCase() !== word.toLowerCase()) return null; // only accept exact matches
+
+    const posMap = { n: 'noun', v: 'verb', adj: 'adjective', adv: 'adverb', u: 'other' };
+    const meaningsByPos = {};
+    w.defs.forEach(defStr => {
+      const parts = defStr.split('\t');
+      const posAbbr = parts[0];
+      const def = parts[1] || parts[0];
+      const pos = posMap[posAbbr] || 'other';
+      if (!meaningsByPos[pos]) meaningsByPos[pos] = [];
+      meaningsByPos[pos].push({ definition: def });
+    });
+    const meanings = Object.keys(meaningsByPos).map(pos => ({
+      partOfSpeech: pos,
+      definitions: meaningsByPos[pos]
+    }));
+
+    return [{ word: w.word, phonetic: '', phonetics: [], meanings }];
+  } catch (err) {
+    return null;
+  }
+}
+
+async function fetchSynAntonyms(word) {
+  try {
+    const [synRes, antRes] = await Promise.all([
+      fetchWithTimeout('https://api.datamuse.com/words?rel_syn=' + encodeURIComponent(word) + '&max=8', {}, 5000),
+      fetchWithTimeout('https://api.datamuse.com/words?rel_ant=' + encodeURIComponent(word) + '&max=8', {}, 5000)
+    ]);
+    const syns = synRes.ok ? (await synRes.json()).map(d => d.word) : [];
+    const ants = antRes.ok ? (await antRes.json()).map(d => d.word) : [];
+    return { syns, ants };
+  } catch (err) {
+    return { syns: [], ants: [] };
+  }
+}
+
+function renderSynAntonyms(syns, ants) {
+  synTags.innerHTML = '';
+  antTags.innerHTML = '';
+
+  if (syns.length) {
+    syns.forEach(w => {
+      const tag = document.createElement('span');
+      tag.className = 'tag syn';
+      tag.textContent = w;
+      tag.addEventListener('click', () => { wordInput.value = w; hideSuggestions(); lookupWord(); });
+      synTags.appendChild(tag);
+    });
+    synRow.style.display = 'block';
+  } else {
+    synRow.style.display = 'none';
+  }
+
+  if (ants.length) {
+    ants.forEach(w => {
+      const tag = document.createElement('span');
+      tag.className = 'tag ant';
+      tag.textContent = w;
+      tag.addEventListener('click', () => { wordInput.value = w; hideSuggestions(); lookupWord(); });
+      antTags.appendChild(tag);
+    });
+    antRow.style.display = 'block';
+  } else {
+    antRow.style.display = 'none';
+  }
+
+  synantSection.style.display = (syns.length || ants.length) ? 'block' : 'none';
+}
+
+function renderPhonetic(phoneticText, audioUrl) {
+  resPhonetic.innerHTML = '';
+  if (phoneticText) {
+    const span = document.createElement('span');
+    span.textContent = phoneticText;
+    resPhonetic.appendChild(span);
+  }
+  if (audioUrl) {
+    const btn = document.createElement('button');
+    btn.className = 'audio-btn';
+    btn.innerHTML = '&#9658;'; // play triangle
+    btn.title = 'Play pronunciation';
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const audio = new Audio(audioUrl);
+      btn.classList.add('playing');
+      audio.play().catch(() => { btn.classList.remove('playing'); });
+      audio.addEventListener('ended', () => btn.classList.remove('playing'));
+    });
+    resPhonetic.appendChild(btn);
+  }
+}
+
+async function fetchDefinition(word, attempt = 1) {
+  try {
+    const res = await fetchWithTimeout('https://api.dictionaryapi.dev/api/v2/entries/en/' + encodeURIComponent(word), {}, 6000);
+    if (res.status === 404) return null; // genuinely no entry for this word
+    if (!res.ok) {
+      // Server hiccup (5xx, rate limit, etc.) — retry once before giving up
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 350));
+        return fetchDefinition(word, attempt + 1);
+      }
+      throw new Error('server-error');
+    }
+    return res.json();
+  } catch (err) {
+    if (err.message === 'server-error') throw err;
+    // Network-level failure (offline, blocked, DNS, etc.) — retry once
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 350));
+      return fetchDefinition(word, attempt + 1);
+    }
+    throw new Error('network-error');
+  }
+}
+
+async function lookupWord() {
+  const rawWord = wordInput.value.trim();
+  if (!rawWord) {
+    setStatus('Type a word first.', 'error');
+    return;
+  }
+  setStatus('Looking up "' + rawWord + '"...', 'loading');
+  resultCard.classList.remove('visible');
+  lookupBtn.disabled = true;
+
+  try {
+    let data;
+    let resolvedWord = rawWord;
+    let usedFallback = false;
+    let primaryFailure = null; // 'network-error' | 'server-error' | null (genuine not-found)
+
+    try {
+      data = await fetchDefinition(rawWord);
+    } catch (fetchErr) {
+      primaryFailure = fetchErr.message; // dictionaryapi.dev unreachable — don't give up yet
+    }
+
+    if (!data) {
+      // Try common root-word fallbacks against the primary source, all at once
+      // (e.g. "clumsily" -> "clumsy") instead of one-by-one, to cut wait time.
+      const candidates = getFallbackCandidates(rawWord);
+      if (candidates.length) {
+        const results = await Promise.all(
+          candidates.map(candidate =>
+            fetchDefinition(candidate).then(
+              d => ({ candidate, data: d }),
+              () => ({ candidate, data: null })
+            )
+          )
+        );
+        const hit = results.find(r => r.data);
+        if (hit) {
+          data = hit.data;
+          resolvedWord = hit.candidate;
+          usedFallback = true;
+        }
+      }
+    }
+
+    if (!data) {
+      // Primary source (and its root-word variants) had nothing — try the backup source
+      data = await fetchFromDatamuseBackup(rawWord);
+      if (data) resolvedWord = rawWord;
+    }
+
+    if (!data) {
+      if (primaryFailure) {
+        const msg = primaryFailure === 'server-error'
+          ? 'The dictionary service is having trouble right now. Please try again in a moment.'
+          : 'Could not reach the dictionary service. Check your internet connection and try again.';
+        setStatus(msg, 'error');
+      } else {
+        setStatus('Could not find a meaning for "' + rawWord + '". Check the spelling and try again.', 'error');
+      }
+      currentEntry = null;
+      resultCard.classList.remove('visible');
+      lookupBtn.disabled = false;
+      return;
+    }
+
+    const entry = data[0];
+
+    const phonetic = entry.phonetic ||
+      (entry.phonetics && entry.phonetics.find(p => p.text) || {}).text || '';
+
+    const audioUrl = (entry.phonetics && entry.phonetics.find(p => p.audio) || {}).audio || '';
+    renderPhonetic(phonetic, audioUrl);
+
+    // Flatten meanings into a simple structure for display + saving
+    const meaningsFlat = [];
+    resMeanings.innerHTML = '';
+    entry.meanings.forEach(m => {
+      const posDiv = document.createElement('div');
+      posDiv.className = 'meaning-block';
+      const posLabel = document.createElement('div');
+      posLabel.className = 'pos';
+      posLabel.textContent = m.partOfSpeech;
+      posDiv.appendChild(posLabel);
+
+      m.definitions.slice(0, 3).forEach(d => {
+        const defDiv = document.createElement('div');
+        defDiv.className = 'definition';
+        defDiv.textContent = d.definition;
+        posDiv.appendChild(defDiv);
+        meaningsFlat.push(m.partOfSpeech + ': ' + d.definition);
+
+        if (d.example) {
+          const exDiv = document.createElement('div');
+          exDiv.className = 'example';
+          exDiv.textContent = '"' + d.example + '"';
+          posDiv.appendChild(exDiv);
+        }
+      });
+      resMeanings.appendChild(posDiv);
+    });
+
+    currentEntry = {
+      word: entry.word,
+      phonetic: phonetic,
+      meaning: meaningsFlat.join(' | ')
+    };
+
+    resWord.textContent = entry.word;
+    resultCard.classList.add('visible');
+    if (usedFallback) {
+      setStatus('No entry for "' + rawWord + '" — showing root word "' + resolvedWord + '" instead.', 'success');
+    } else {
+      setStatus('', '');
+    }
+
+    // Synonyms/antonyms load separately so they don't block showing the definition
+    synantSection.style.display = 'none';
+    fetchSynAntonyms(entry.word).then(({ syns, ants }) => renderSynAntonyms(syns, ants));
+  } catch (err) {
+    setStatus('Could not find a meaning for "' + rawWord + '". Check the spelling and try again.', 'error');
+    currentEntry = null;
+  } finally {
+    lookupBtn.disabled = false;
+  }
+}
+
+async function saveEntry() {
+  if (!currentEntry) return;
+  if (!SHEET_URL || SHEET_URL.includes('PASTE_YOUR')) {
+    setStatus('Add your Google Apps Script URL in the code first (see note above).', 'error');
+    return;
+  }
+  saveBtn.disabled = true;
+  setStatus('Saving...', 'loading');
+  try {
+    // Using POST with an "action" field avoids CORS preflight issues with Apps Script
+    await fetchWithTimeout(SHEET_URL, {
+      method: 'POST',
+      mode: 'no-cors', // Apps Script web apps don't return CORS headers; no-cors lets the write go through
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'addWord',
+        word: currentEntry.word,
+        meaning: currentEntry.meaning
+      })
+    }, 10000);
+
+    setStatus('Saved "' + currentEntry.word + '" to your sheet.', 'success');
+    addToHistory(currentEntry);
+  } catch (err) {
+    setStatus('Save failed. Check your Apps Script URL and internet connection.', 'error');
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
+function addToHistory(entry) {
+  savedWords.push({ word: entry.word, meaning: entry.meaning });
+  historySection.style.display = 'block';
+  const row = document.createElement('div');
+  row.className = 'history-item';
+  const w = document.createElement('span');
+  w.className = 'h-word';
+  w.textContent = entry.word;
+  const m = document.createElement('span');
+  m.className = 'h-meaning';
+  m.textContent = entry.meaning.split(' | ')[0];
+  row.appendChild(w);
+  row.appendChild(m);
+  historyList.prepend(row);
+}
+
+// ===== Quiz mode (multiple choice, sourced from the full Google Sheet) =====
+let quizDeck = [];
+let quizIndex = 0;
+let quizScore = 0;
+let quizAnswered = false;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function shortMeaning(meaning) {
+  // Sheet meanings are stored like "noun: def1 | verb: def2" — just use the first clause
+  return (meaning || '').split(' | ')[0].replace(/^[a-z]+:\s*/i, '');
+}
+
+async function fetchSheetWords() {
+  const res = await fetchWithTimeout(SHEET_URL, { method: 'GET' }, 10000);
+  if (!res.ok) throw new Error('sheet-fetch-failed');
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error('sheet-format-unexpected');
+  return data
+    .filter(row => row && row.word && row.meaning)
+    .map(row => ({ word: row.word, meaning: shortMeaning(row.meaning) }));
+}
+
+function buildQuizDeck(words) {
+  const shuffledWords = shuffle(words);
+  return shuffledWords.map(item => {
+    const otherMeanings = shuffle(
+      words.filter(w => w.word !== item.word).map(w => w.meaning)
+    ).slice(0, 3);
+    const options = shuffle([item.meaning, ...otherMeanings]);
+    return { word: item.word, correctMeaning: item.meaning, options };
+  });
+}
+
+async function startQuiz() {
+  if (!SHEET_URL || SHEET_URL.includes('PASTE_YOUR')) {
+    quizContent.innerHTML = '<div class="quiz-empty">Add your Google Apps Script URL in the code first, then try again.</div>';
+    quizOverlay.classList.add('visible');
+    return;
+  }
+
+  quizContent.innerHTML = '<div class="quiz-loading">Loading your saved words from the sheet...</div>';
+  quizOverlay.classList.add('visible');
+
+  let words;
+  try {
+    words = await fetchSheetWords();
+  } catch (err) {
+    quizContent.innerHTML =
+      '<div class="quiz-empty">Could not load words from your sheet. Make sure your Apps Script has a <code>doGet</code> function ' +
+      'that returns your saved words as JSON (see setup notes), and that it\'s deployed with access set to "Anyone."</div>';
+    return;
+  }
+
+  if (words.length < 4) {
+    quizContent.innerHTML =
+      '<div class="quiz-empty">You need at least 4 words saved in your sheet for a multiple-choice quiz — you currently have ' +
+      words.length + '. Save a few more words, then try again.</div>';
+    return;
+  }
+
+  quizDeck = buildQuizDeck(words);
+  quizIndex = 0;
+  quizScore = 0;
+  renderQuizQuestion();
+}
+
+function renderQuizQuestion() {
+  if (quizIndex >= quizDeck.length) {
+    const pct = Math.round((quizScore / quizDeck.length) * 100);
+    quizContent.innerHTML =
+      '<div class="quiz-word">Quiz complete!</div>' +
+      '<div class="quiz-final-score">' + quizScore + ' / ' + quizDeck.length + '</div>' +
+      '<div class="quiz-score">' + pct + '% correct</div>' +
+      '<div class="quiz-actions" style="margin-top:18px;"><button id="quizRestartBtn">Take quiz again</button></div>';
+    document.getElementById('quizRestartBtn').addEventListener('click', startQuiz);
+    return;
+  }
+
+  quizAnswered = false;
+  const q = quizDeck[quizIndex];
+  const optionsHtml = q.options.map((opt, i) =>
+    '<button class="quiz-option" data-option-index="' + i + '">' + opt + '</button>'
+  ).join('');
+
+  quizContent.innerHTML =
+    '<div class="quiz-progress">Question ' + (quizIndex + 1) + ' of ' + quizDeck.length + ' &middot; Score: ' + quizScore + '</div>' +
+    '<div class="quiz-word">' + q.word + '</div>' +
+    '<div class="quiz-options" id="quizOptionsBox">' + optionsHtml + '</div>' +
+    '<div class="quiz-next-row" id="quizNextRow" style="display:none;"><button id="quizNextBtn">Next question</button></div>';
+
+  const optionButtons = quizContent.querySelectorAll('.quiz-option');
+  optionButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (quizAnswered) return;
+      quizAnswered = true;
+      const chosen = btn.textContent;
+      optionButtons.forEach(b => {
+        b.disabled = true;
+        if (b.textContent === q.correctMeaning) b.classList.add('correct-answer');
+      });
+      if (chosen !== q.correctMeaning) btn.classList.add('wrong-answer');
+      else quizScore++;
+      document.getElementById('quizNextRow').style.display = 'block';
+    });
+  });
+
+  quizContent.querySelector('#quizNextRow').addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'quizNextBtn') {
+      quizIndex++;
+      renderQuizQuestion();
+    }
+  });
+}
+
+quizBtn.addEventListener('click', startQuiz);
+quizCloseBtn.addEventListener('click', () => quizOverlay.classList.remove('visible'));
+quizOverlay.addEventListener('click', (e) => {
+  if (e.target === quizOverlay) quizOverlay.classList.remove('visible');
+});
+
+lookupBtn.addEventListener('click', () => { hideSuggestions(); lookupWord(); });
+saveBtn.addEventListener('click', saveEntry);
+wordInput.addEventListener('keydown', e => {
+  const isOpen = suggestionsBox.classList.contains('visible');
+
+  if (isOpen && e.key === 'ArrowDown') {
+    e.preventDefault();
+    activeSuggestionIndex = Math.min(activeSuggestionIndex + 1, currentSuggestions.length - 1);
+    updateActiveSuggestion();
+  } else if (isOpen && e.key === 'ArrowUp') {
+    e.preventDefault();
+    activeSuggestionIndex = Math.max(activeSuggestionIndex - 1, -1);
+    updateActiveSuggestion();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (isOpen && activeSuggestionIndex >= 0) {
+      selectSuggestion(currentSuggestions[activeSuggestionIndex]);
+    } else {
+      hideSuggestions();
+      lookupWord();
+    }
+  } else if (e.key === 'Escape') {
+    hideSuggestions();
+  }
+});
+
+loadWordOfTheDay();
+</script>
+</body>
+</html>
